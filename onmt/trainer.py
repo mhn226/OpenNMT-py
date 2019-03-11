@@ -184,6 +184,9 @@ class Trainer(object):
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
 
+        # Set valid_steps = save_checkpoint_steps
+        valid_steps = save_checkpoint_steps
+
         if self.n_gpu > 1:
             train_iter = itertools.islice(
                 train_iter, self.gpu_rank, None, self.n_gpu)
@@ -235,13 +238,15 @@ class Trainer(object):
             if (self.model_saver is not None
                 and (save_checkpoint_steps != 0
                      and step % save_checkpoint_steps == 0)):
-                self.model_saver.save(step, moving_average=self.moving_average)
+                # Add validation stats
+                self.model_saver.save(step, valid_stats, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
         if self.model_saver is not None:
-            self.model_saver.save(step, moving_average=self.moving_average)
+            # Add validation stats
+            self.model_saver.save(step, valid_stats, moving_average=self.moving_average)
         return total_stats
 
     def validate(self, valid_iter, moving_average=None):
