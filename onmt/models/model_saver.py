@@ -38,7 +38,7 @@ class ModelSaverBase(object):
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
 
-    def save(self, step, moving_average=None):
+    def save(self, step, stats, moving_average=None):
         """Main entry point for model saver
 
         It wraps the `_save` method with checks and apply `keep_checkpoint`
@@ -55,7 +55,7 @@ class ModelSaverBase(object):
         else:
             save_model = self.model
 
-        chkpt, chkpt_name = self._save(step, save_model)
+        chkpt, chkpt_name = self._save(step, stats, save_model)
         self.last_saved_step = step
 
         if moving_average:
@@ -67,7 +67,7 @@ class ModelSaverBase(object):
                 self._rm_checkpoint(todel)
             self.checkpoint_queue.append(chkpt_name)
 
-    def _save(self, step):
+    def _save(self, step, stats):
         """Save a resumable checkpoint.
 
         Args:
@@ -96,7 +96,7 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model):
+    def _save(self, step, stats, model):
         real_model = (model.module
                       if isinstance(model, nn.DataParallel)
                       else model)
@@ -116,8 +116,9 @@ class ModelSaver(ModelSaverBase):
             'optim': self.optim.state_dict(),
         }
 
-        logger.info("Saving checkpoint %s_step_%d.pt" % (self.base_path, step))
-        checkpoint_path = '%s_step_%d.pt' % (self.base_path, step)
+        # Add stats
+        logger.info("Saving checkpoint %s_step_%d_acc_%g_ppl_%g.pt" % (self.base_path, step, stats.accuracy(), stats.ppl()))
+        checkpoint_path = '%s_step_%d_acc_%g_ppl_%g.pt' % (self.base_path, step, stats.accuracy(), stats.ppl())
         torch.save(checkpoint, checkpoint_path)
         return checkpoint, checkpoint_path
 
