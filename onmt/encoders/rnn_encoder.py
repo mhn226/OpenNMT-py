@@ -62,11 +62,12 @@ class RNNEncoder(EncoderBase):
 
     def forward(self, src, lengths=None):
         """See :func:`EncoderBase.forward()`"""
+        print('###########################')
+        print(src)
+        print('#### src size ##### ' + str(src.size()))
         self._check_args(src, lengths)
-
         emb = self.embeddings(src)
         # s_len, batch, emb_dim = emb.size()
-
         packed_emb = emb
         if lengths is not None and not self.no_pack_padded_seq:
             # Lengths data is wrapped inside a Tensor.

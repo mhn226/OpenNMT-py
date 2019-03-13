@@ -82,11 +82,17 @@ class TransformerEncoder(EncoderBase):
         * memory_bank ``(src_len, batch_size, model_dim)``
     """
 
-    def __init__(self, num_layers, d_model, heads, d_ff, dropout, embeddings,
-                 max_relative_positions):
+    def __init__(self, num_layers, d_model, heads, d_ff, dropout,
+                 max_relative_positions, model_type, embeddings=None):
         super(TransformerEncoder, self).__init__()
 
+        ## For speech processing
+        # Add a projection layer to change the dimension of the input
+        self.W = nn.Linear(161, d_model, bias=False)
+
         self.embeddings = embeddings
+        self.model_type = model_type
+
         self.transformer = nn.ModuleList(
             [TransformerEncoderLayer(
                 d_model, heads, d_ff, dropout,
@@ -95,7 +101,7 @@ class TransformerEncoder(EncoderBase):
         self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
 
     @classmethod
-    def from_opt(cls, opt, embeddings):
+    def from_opt(cls, opt, embeddings=None):
         """Alternate constructor."""
         return cls(
             opt.enc_layers,
@@ -103,20 +109,50 @@ class TransformerEncoder(EncoderBase):
             opt.heads,
             opt.transformer_ff,
             opt.dropout,
-            embeddings,
-            opt.max_relative_positions)
+            opt.max_relative_positions,
+            opt.model_type,
+            embeddings)
 
     def forward(self, src, lengths=None):
         """See :func:`EncoderBase.forward()`"""
-        self._check_args(src, lengths)
+        if self.model_type == 'audio':
+            #print('###################### audio transformer ######################')
+            lengths = lengths.view(-1).tolist()
+            batch_size, _, nfft, t = src.size()
+            #print('####### src size #######  ' + str(src.size()))
+            #print('### t1 ###  ' + str(src.transpose(0, 1).size()))
+            #print('### t2 ###  ' + str(src.transpose(0, 1).transpose(0, 3).size()))
+            #print('### t3 ###  ' + str(src.transpose(0, 1).transpose(0, 3).contiguous().view(t, batch_size, nfft).size()))
+            src = src.transpose(0, 1).transpose(0, 3).contiguous() \
+                     .view(t, batch_size, nfft)
+            emb = self.W(src)
+            out = emb.transpose(0, 1).contiguous()
 
-        emb = self.embeddings(src)
+            # Mask
+            #print('### src size ###  ' + str(src.size()))
+            padding_idx = 0
+            mask = src.transpose(0,1).data.eq(padding_idx).sum(dim=2)
+            mask = mask.data.eq(nfft).unsqueeze(1)
+            #mask = mask.data.eq(padding_idx).eq(padding_idx).unsqueeze(1)
+            #print(mask)
+            #mask = words.data.eq(padding_idx).unsqueeze(1)  # [B, 1, T]
 
-        out = emb.transpose(0, 1).contiguous()
-        words = src[:, :, 0].transpose(0, 1)
-        w_batch, w_len = words.size()
-        padding_idx = self.embeddings.word_padding_idx
-        mask = words.data.eq(padding_idx).unsqueeze(1)  # [B, 1, T]
+        else:
+            print('#### src size ####  ' + str(src.size()))
+            self._check_args(src, lengths)
+
+            emb = self.embeddings(src)
+
+            out = emb.transpose(0, 1).contiguous()
+            print('#### src size ####  ' + str(src.size()))
+            words = src[:, :, 0].transpose(0, 1)
+            print('#### word size ####  ' + str(words.size()))
+            w_batch, w_len = words.size()
+            padding_idx = self.embeddings.word_padding_idx
+            print('######### padding idx ###########:  ' + str(padding_idx))
+            mask = words.data.eq(padding_idx).unsqueeze(1)  # [B, 1, T]
+            print(mask.size())
+
         # Run the forward pass of every layer of the tranformer.
         for layer in self.transformer:
             out = layer(out, mask)

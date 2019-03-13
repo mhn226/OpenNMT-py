@@ -99,6 +99,11 @@ class AudioEncoder(EncoderBase):
     def forward(self, src, lengths=None):
         """See :func:`onmt.encoders.encoder.EncoderBase.forward()`"""
         batch_size, _, nfft, t = src.size()
+        print('####### src size #######  ' + str(src.size()))
+        print('### t1 ###  ' + str(src.transpose(0, 1).size()))
+        print('### t2 ###  ' + str(src.transpose(0, 1).transpose(0, 3).size()))
+        print('### t3 ###  ' + str(src.transpose(0, 1).transpose(0, 3).contiguous().view(t, batch_size, nfft).size()))
+
         src = src.transpose(0, 1).transpose(0, 3).contiguous() \
                  .view(t, batch_size, nfft)
         orig_lengths = lengths

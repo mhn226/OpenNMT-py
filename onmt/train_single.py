@@ -34,7 +34,7 @@ def _tally_parameters(model):
 
 
 def configure_process(opt, device_id):
-    device_id = 1
+    #device_id = 1
     if device_id >= 0:
         print(device_id)
         torch.cuda.set_device(device_id)
