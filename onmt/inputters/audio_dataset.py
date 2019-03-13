@@ -80,17 +80,28 @@ class AudioDataReader(DataReaderBase):
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
+        
         # STFT
         d = librosa.stft(sound, n_fft=n_fft, hop_length=hop_length,
                          win_length=win_length, window=self.window)
         spect, _ = librosa.magphase(d)
         spect = np.log1p(spect)
         spect = torch.FloatTensor(spect)
+
+        """
+        # MFCC
+        d = librosa.feature.mfcc(y=sound, n_mfcc=40, sr=self.sample_rate, n_fft=n_fft, hop_length=hop_length)
+        spect, _ = librosa.magphase(d)
+        spect = np.log1p(spect)
+        spect = torch.FloatTensor(spect)
+        """
+
         if self.normalize_audio:
             mean = spect.mean()
             std = spect.std()
             spect.add_(-mean)
             spect.div_(std)
+        print(spect.size())
         return spect
 
     def read(self, data, side, src_dir=None):
