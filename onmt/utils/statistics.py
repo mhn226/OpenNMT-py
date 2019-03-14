@@ -129,6 +129,7 @@ class Statistics(object):
     def log_tensorboard(self, prefix, writer, learning_rate, step):
         """ display statistics to tensorboard """
         t = self.elapsed_time()
+        writer.add_scalar(prefix + "/loss", self.loss, step)
         writer.add_scalar(prefix + "/xent", self.xent(), step)
         writer.add_scalar(prefix + "/ppl", self.ppl(), step)
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
