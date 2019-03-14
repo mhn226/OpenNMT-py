@@ -61,130 +61,54 @@ class AudioEmbeddings(nn.Module):
 
        graph LR
           A[Input]
-          C[Feature 1 Lookup]
-          A-->B[Word Lookup]
-          A-->C
-          A-->D[Feature N Lookup]
-          B-->E[MLP/Concat]
-          C-->E
-          D-->E
-          E-->F[Output]
+          A-->B[dim & norm]
+          A-->C[positional encoding]
+          B-->D[sum]
+          C-->D
+          output == D
 
     Args:
-        word_vec_size (int): size of the dictionary of embeddings.
-        word_padding_idx (int): padding index for words in the embeddings.
-        feat_padding_idx (List[int]): padding index for a list of features
-                                   in the embeddings.
-        word_vocab_size (int): size of dictionary of embeddings for words.
-        feat_vocab_sizes (List[int], optional): list of size of dictionary
-            of embeddings for each feature.
+        n_feats (int): number of input features (default: 40 (MFCCs))
+        embedding_size (int): equal to the size of the model (d_model)
         position_encoding (bool): see :class:`~onmt.modules.PositionalEncoding`
-        feat_merge (string): merge action for the features embeddings:
-            concat, sum or mlp.
-        feat_vec_exponent (float): when using `-feat_merge concat`, feature
-            embedding size is N^feat_dim_exponent, where N is the
-            number of values the feature takes.
-        feat_vec_size (int): embedding dimension for features when using
-            `-feat_merge mlp`
         dropout (float): dropout probability.
     """
 
-    def __init__(self, word_vec_size,
-                 word_vocab_size,
-                 word_padding_idx,
+    def __init__(self, n_feats,
+                 embedding_size,
                  position_encoding=False,
-                 feat_merge="concat",
-                 feat_vec_exponent=0.7,
-                 feat_vec_size=-1,
-                 feat_padding_idx=[],
-                 feat_vocab_sizes=[],
-                 dropout=0,
-                 sparse=False,
-                 fix_word_vecs=False):
-
-        if feat_padding_idx is None:
-            feat_padding_idx = []
-        self.word_padding_idx = word_padding_idx
-
-        self.word_vec_size = word_vec_size
-
-        # Dimensions and padding for constructing the word embedding matrix
-        vocab_sizes = [word_vocab_size]
-        emb_dims = [word_vec_size]
-        pad_indices = [word_padding_idx]
-
-        # Dimensions and padding for feature embedding matrices
-        # (these have no effect if feat_vocab_sizes is empty)
-        if feat_merge == 'sum':
-            feat_dims = [word_vec_size] * len(feat_vocab_sizes)
-        elif feat_vec_size > 0:
-            feat_dims = [feat_vec_size] * len(feat_vocab_sizes)
-        else:
-            feat_dims = [int(vocab ** feat_vec_exponent)
-                         for vocab in feat_vocab_sizes]
-        vocab_sizes.extend(feat_vocab_sizes)
-        emb_dims.extend(feat_dims)
-        pad_indices.extend(feat_padding_idx)
-
-        # The embedding matrix look-up tables. The first look-up table
-        # is for words. Subsequent ones are for features, if any exist.
-        emb_params = zip(vocab_sizes, emb_dims, pad_indices)
-        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad, sparse=sparse)
-                      for vocab, dim, pad in emb_params]
-        emb_luts = Elementwise(feat_merge, embeddings)
-
-        # The final output size of word + feature vectors. This can vary
-        # from the word vector size if and only if features are defined.
-        # This is the attribute you should access if you need to know
-        # how big your embeddings are going to be.
-        self.embedding_size = (sum(emb_dims) if feat_merge == 'concat'
-                               else word_vec_size)
-
-        # The sequence of operations that converts the input sequence
-        # into a sequence of embeddings. At minimum this consists of
-        # looking up the embeddings for each word and feature in the
-        # input. Model parameters may require the sequence to contain
-        # additional operations as well.
+                 dropout=0):
         super(AudioEmbeddings, self).__init__()
-        self.make_embedding = nn.Sequential()
-
-        if feat_merge == 'mlp' and len(feat_vocab_sizes) > 0:
-            in_dim = sum(emb_dims)
-            mlp = nn.Sequential(nn.Linear(in_dim, word_vec_size), nn.ReLU())
-            self.make_embedding.add_module('mlp', mlp)
-
-        self.position_encoding = position_encoding
-
+        
+        self.n_feats = n_feats
+        self.embedding_size = embedding_size
+        
+        self.dropout = dropout
+        self.position_encoding = position_encoding 
+        
         if self.position_encoding:
-            pe = PositionalEncoding(dropout, self.embedding_size)
-            self.make_embedding.add_module('pe', pe)
+            self.pe = PossionalEncoding(dropout=self.dropout, dim=self.embedding_size())
+        else:
+            self.pe = None
 
-        if fix_word_vecs:
-            self.word_lut.weight.requires_grad = False
-
-
-    def emb_luts(self):
-        """Embedding look-up table."""
-        return self.make_embedding[0]
+        # Linear projection to change to dimension of the audio input n_feats -> embedding_size
+        self.W = nn.Linear(self.n_feats, self.embedding_size, bias=False)
+        self.layer_norm = nn.LayerNorm(self.embedding_size, eps=1e-6)
 
 
-    def forward(self, source, step=None):
+    def forward(self, src):
         """Computes the embeddings for words and features.
 
         Args:
-            source (LongTensor): index tensor ``(len, batch, nfeat)``
+            src (LongTensor): index tensor ``(len, batch, nfeat)``
 
         Returns:
             FloatTensor: Word embeddings ``(len, batch, embedding_size)``
         """
+        
+        src = self.layer_norm(self.W(src))
 
-        if self.position_encoding:
-            for i, module in enumerate(self.make_embedding._modules.values()):
-                if i == len(self.make_embedding._modules.values()) - 1:
-                    source = module(source, step=step)
-                else:
-                    source = module(source)
-        else:
-            source = self.make_embedding(source)
+        if self.pe:
+            src = self.pe(src)
 
-        return source
+        return src
