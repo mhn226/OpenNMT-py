@@ -13,7 +13,7 @@ from onmt.encoders import str2enc
 
 from onmt.decoders import str2dec
 
-from onmt.modules import Embeddings, CopyGenerator
+from onmt.modules import AudioEmbeddings, Embeddings, CopyGenerator
 from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
@@ -54,6 +54,14 @@ def build_embeddings(opt, text_field, for_encoder=True):
     )
     return emb
 
+def build_audio_embeddings(opt):
+    emb = AudioEmbeddings(
+        n_feats=161,
+        embedding_size=opt.rnn_size,
+        position_encoding=True,
+        dropout=0
+    )
+    return emb
 
 def build_encoder(opt, embeddings):
     """
@@ -126,6 +134,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     if model_opt.model_type == "text":
         src_field = fields["src"]
         src_emb = build_embeddings(model_opt, src_field)
+    elif model_opt.model_type == "audio":
+        src_emb = build_audio_embeddings(model_opt)
     else:
         src_emb = None
     # Build encoder.

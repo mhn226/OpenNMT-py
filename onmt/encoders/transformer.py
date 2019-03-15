@@ -88,7 +88,6 @@ class TransformerEncoder(EncoderBase):
 
         ## For speech processing
         # Add a projection layer to change the dimension of the input
-        self.W = nn.Linear(161, d_model, bias=False)
 
         self.embeddings = embeddings
         self.model_type = model_type
@@ -125,7 +124,7 @@ class TransformerEncoder(EncoderBase):
             #print('### t3 ###  ' + str(src.transpose(0, 1).transpose(0, 3).contiguous().view(t, batch_size, nfft).size()))
             src = src.transpose(0, 1).transpose(0, 3).contiguous() \
                      .view(t, batch_size, nfft)
-            emb = self.W(src)
+            emb = self.embeddings(src)
             out = emb.transpose(0, 1).contiguous()
 
             # Mask

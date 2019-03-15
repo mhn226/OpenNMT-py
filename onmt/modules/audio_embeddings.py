@@ -44,7 +44,6 @@ class PositionalEncoding(nn.Module):
             step (int or NoneType): If stepwise (``seq_len = 1``), use
                 the encoding for this position.
         """
-
         emb = emb * math.sqrt(self.dim)
         if step is None:
             emb = emb + self.pe[:emb.size(0)]
@@ -87,7 +86,7 @@ class AudioEmbeddings(nn.Module):
         self.position_encoding = position_encoding 
         
         if self.position_encoding:
-            self.pe = PossionalEncoding(dropout=self.dropout, dim=self.embedding_size())
+            self.pe = PositionalEncoding(dropout=self.dropout, dim=self.embedding_size)
         else:
             self.pe = None
 
@@ -105,9 +104,7 @@ class AudioEmbeddings(nn.Module):
         Returns:
             FloatTensor: Word embeddings ``(len, batch, embedding_size)``
         """
-        
         src = self.layer_norm(self.W(src))
-
         if self.pe:
             src = self.pe(src)
 
