@@ -71,12 +71,13 @@ class AudioEmbeddings(nn.Module):
         embedding_size (int): equal to the size of the model (d_model)
         position_encoding (bool): see :class:`~onmt.modules.PositionalEncoding`
         dropout (float): dropout probability.
+        downsampling (bool): apply down sampling or not (default: False)
     """
 
     def __init__(self, n_feats,
                  embedding_size,
                  position_encoding=False,
-                 dropout=0):
+                 dropout=0, downsampling=False):
         super(AudioEmbeddings, self).__init__()
         
         self.n_feats = n_feats
@@ -84,7 +85,9 @@ class AudioEmbeddings(nn.Module):
         
         self.dropout = dropout
         self.position_encoding = position_encoding 
-        
+
+        self.downsampling = downsampling        
+
         if self.position_encoding:
             self.pe = PositionalEncoding(dropout=self.dropout, dim=self.embedding_size)
         else:
@@ -109,3 +112,16 @@ class AudioEmbeddings(nn.Module):
             src = self.pe(src)
 
         return src
+
+    def down_sampling(self, src):
+        """
+        Reshape the src tensor (to reduce to len dimension)
+        Idea of "Self-attention Acoustic Models"
+        Conditions:
+            len % downsample_factor = 0 (this should affect padding and batching audio)
+            nfeats * downsample_factor = d_model => not very flexible params choosing
+        We should use conv layers instead???
+        """
+        ## Not implement for the moment
+        return src
+         

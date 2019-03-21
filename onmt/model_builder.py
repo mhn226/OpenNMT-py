@@ -58,7 +58,7 @@ def build_audio_embeddings(opt):
     emb = AudioEmbeddings(
         n_feats=161,
         embedding_size=opt.rnn_size,
-        position_encoding=True,
+        position_encoding=False,
         dropout=0
     )
     return emb

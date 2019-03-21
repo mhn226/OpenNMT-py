@@ -152,7 +152,7 @@ class ReportMgr(ReportMgrBase):
         if valid_stats is not None:
             self.log('Validation perplexity: %g' % valid_stats.ppl())
             self.log('Validation accuracy: %g' % valid_stats.accuracy())
-
+            self.log('Validation bleu: %g' % valid_stats.bleu())
             self.maybe_log_tensorboard(valid_stats,
                                        "valid",
                                        lr,
