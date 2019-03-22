@@ -117,8 +117,8 @@ class ModelSaver(ModelSaverBase):
         }
 
         # Add stats
-        logger.info("Saving checkpoint %s_step_%d_acc_%g_ppl_%g.pt" % (self.base_path, step, stats.accuracy(), stats.ppl()))
-        checkpoint_path = '%s_step_%d_acc_%g_ppl_%g.pt' % (self.base_path, step, stats.accuracy(), stats.ppl())
+        logger.info("Saving checkpoint %s_step_%d_acc_%g_ppl_%g_bleu_%g.pt" % (self.base_path, step, stats.accuracy(), stats.ppl(), stats.bleu()))
+        checkpoint_path = '%s_step_%d_acc_%g_ppl_%g_bleu_%g.pt' % (self.base_path, step, stats.accuracy(), stats.ppl(), stats.bleu())
         torch.save(checkpoint, checkpoint_path)
         return checkpoint, checkpoint_path
 

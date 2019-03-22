@@ -186,6 +186,9 @@ class Trainer(object):
 
         # Set valid_steps = save_checkpoint_steps
         valid_steps = save_checkpoint_steps
+        valid_bleu = 0
+        early_stopping_count = 0
+        early_stopping = False
 
         if self.n_gpu > 1:
             train_iter = itertools.islice(
@@ -194,6 +197,11 @@ class Trainer(object):
         for i, (batches, normalization) in enumerate(
                 self._accum_batches(train_iter)):
             step = self.optim.training_step
+            if step > 10 and early_stopping_count >= 10:
+                # Should check step, just apply early stopping after a certain number of steps
+                early_stopping = True
+                print('Early stopping applied!')
+                break
 
             if self.gpu_verbose_level > 1:
                 logger.info("GpuRank %d: index: %d", self.gpu_rank, i)
@@ -232,6 +240,8 @@ class Trainer(object):
                 if self.gpu_verbose_level > 0:
                     logger.info('GpuRank %d: report stat step %d'
                                 % (self.gpu_rank, step))
+                early_stopping_count = valid_stats.update_early_stoppying(valid_bleu, valid_stats.bleu(), early_stopping_count)
+                valid_bleu = valid_stats.bleu()
                 self._report_step(self.optim.learning_rate(),
                                   step, valid_stats=valid_stats)
 
@@ -244,7 +254,7 @@ class Trainer(object):
             if train_steps > 0 and step >= train_steps:
                 break
 
-        if self.model_saver is not None:
+        if self.model_saver is not None and not early_stopping:
             # Add validation stats
             self.model_saver.save(step, valid_stats, moving_average=self.moving_average)
         return total_stats

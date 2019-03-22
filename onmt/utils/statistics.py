@@ -37,6 +37,10 @@ class Statistics(object):
         self.reference_lengths = reference_lengths
         self.start_time = time.time()
 
+        # add self.bleu
+        self.bleu_ = None
+        self.count = 0
+
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
         """
@@ -147,6 +151,14 @@ class Statistics(object):
     def elapsed_time(self):
         """ compute elapsed time """
         return time.time() - self.start_time
+
+    def update_early_stoppying(self, old_bleu, new_bleu, count):
+        if old_bleu >= new_bleu:
+            count += 1
+        else:
+            count = 0
+        return count
+
 
     def output(self, step, num_steps, learning_rate, start):
         """Write out statistics to stdout.
