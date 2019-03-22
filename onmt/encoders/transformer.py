@@ -137,20 +137,20 @@ class TransformerEncoder(EncoderBase):
             #mask = words.data.eq(padding_idx).unsqueeze(1)  # [B, 1, T]
 
         else:
-            print('#### src size ####  ' + str(src.size()))
+            #print('#### src size ####  ' + str(src.size()))
             self._check_args(src, lengths)
 
             emb = self.embeddings(src)
 
             out = emb.transpose(0, 1).contiguous()
-            print('#### src size ####  ' + str(src.size()))
+            #print('#### src size ####  ' + str(src.size()))
             words = src[:, :, 0].transpose(0, 1)
-            print('#### word size ####  ' + str(words.size()))
+            #print('#### word size ####  ' + str(words.size()))
             w_batch, w_len = words.size()
             padding_idx = self.embeddings.word_padding_idx
-            print('######### padding idx ###########:  ' + str(padding_idx))
+            #print('######### padding idx ###########:  ' + str(padding_idx))
             mask = words.data.eq(padding_idx).unsqueeze(1)  # [B, 1, T]
-            print(mask.size())
+            #print(mask.size())
 
         # Run the forward pass of every layer of the tranformer.
         for layer in self.transformer:

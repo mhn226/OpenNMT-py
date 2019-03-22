@@ -182,3 +182,5 @@ class Statistics(object):
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
         writer.add_scalar(prefix + "/lr", learning_rate, step)
+        if prefix == "valid":
+            writer.add_scalar(prefix + "/bleu", self.bleu(), step)

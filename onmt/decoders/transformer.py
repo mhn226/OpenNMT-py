@@ -195,6 +195,7 @@ class TransformerDecoder(DecoderBase):
             #print(src_pad_mask)
             #src_pad_mask = src_pad_mask.data.eq(padding_idx).eq(padding_idx).unsqueeze(1)
         else:
+            pad_idx = self.embeddings.word_padding_idx
             src_words = src[:, :, 0].transpose(0, 1)
             src_batch, src_len = src_words.size()
             src_pad_mask = src_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_src]
