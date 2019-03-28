@@ -50,7 +50,10 @@ def build_loss_compute(model, tgt_field, opt, train=True):
             criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength
         )
     else:
-        compute = NMTLossCompute(criterion, loss_gen)
+        if train:
+            compute = NMTLossCompute(criterion, loss_gen, False)
+        else:
+            compute = NMTLossCompute(criterion, loss_gen)
     compute.to(device)
 
     return compute
@@ -172,23 +175,26 @@ class LossComputeBase(nn.Module):
         """
        
         pred = scores.max(2)[1]
-        precision_matches, precision_totals, \
-            prediction_lengths, reference_lengths = \
-            bleu_calculations(
-                    pred,
-                    target,
-                    4,
-                    {self.padding_idx})
-
+        
+        if self.bleu_report:
+            precision_matches, precision_totals, \
+                prediction_lengths, reference_lengths = \
+                bleu_calculations(
+                        pred,
+                        target,
+                        4,
+                        {self.padding_idx})
+        else:
+            precision_matches = None
+            precision_totals = None
+            prediction_lengths = 0
+            reference_lengths = 0
         non_padding = target.view(-1).ne(self.padding_idx)
         num_correct = pred.view(-1).eq(target.view(-1)).\
             masked_select(non_padding).sum().item()
 
-        #pred = scores.max(1)[1]
-        #non_padding = target.ne(self.padding_idx)
-        #num_correct = pred.eq(target).masked_select(non_padding).sum().item()
         num_non_padding = non_padding.sum().item()
-        #return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct)
+        
         return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct,
                                      precision_matches, precision_totals,
                                      prediction_lengths, reference_lengths)
@@ -235,8 +241,9 @@ class NMTLossCompute(LossComputeBase):
     Standard NMT Loss Computation.
     """
 
-    def __init__(self, criterion, generator, normalization="sents"):
+    def __init__(self, criterion, generator, bleu_report=True, normalization="sents"):
         super(NMTLossCompute, self).__init__(criterion, generator)
+        self.bleu_report = bleu_report
 
     def _make_shard_state(self, batch, output, range_, attns=None):
         return {
@@ -254,7 +261,6 @@ class NMTLossCompute(LossComputeBase):
         stats = self._stats(loss.clone(), scores, target)
 
         #stats = self._stats(loss.clone(), scores, gtruth)
-
         return loss, stats
 
 

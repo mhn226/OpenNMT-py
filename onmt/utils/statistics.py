@@ -18,7 +18,6 @@ class Statistics(object):
     * elapsed time
     """
 
-    #def __init__(self, loss=0, n_words=0, n_correct=0):
     def __init__(self, loss=0, n_words=0, n_correct=0,
                  precision_matches=Counter(), precision_totals=Counter(),
                  prediction_lengths=0, reference_lengths=0,
@@ -36,10 +35,6 @@ class Statistics(object):
         self.prediction_lengths = prediction_lengths
         self.reference_lengths = reference_lengths
         self.start_time = time.time()
-
-        # add self.bleu
-        self.bleu_ = None
-        self.count = 0
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -98,20 +93,21 @@ class Statistics(object):
         self.loss += stat.loss
         self.n_words += stat.n_words
         self.n_correct += stat.n_correct
-
-        self.precision_matches = {key:
-                                  self.precision_matches.get(key, 0)
-                                  + stat.precision_matches.get(key, 0)
-                                  for key in
-                                  set(self.precision_matches) |
-                                  set(stat.precision_matches)}
-
-        self.precision_totals = {key:
-                                 self.precision_totals.get(key, 0)
-                                 + stat.precision_totals.get(key, 0)
-                                 for key in
-                                 set(self.precision_totals) |
-                                 set(stat.precision_totals)}
+        if stat.precision_matches:
+            self.precision_matches = {key:
+                                      self.precision_matches.get(key, 0)
+                                      + stat.precision_matches.get(key, 0)
+                                      for key in
+                                      set(self.precision_matches) |
+                                      set(stat.precision_matches)}
+        
+        if stat.precision_totals:
+            self.precision_totals = {key:
+                                     self.precision_totals.get(key, 0)
+                                     + stat.precision_totals.get(key, 0)
+                                     for key in
+                                     set(self.precision_totals) |
+                                     set(stat.precision_totals)}
         self.prediction_lengths += stat.prediction_lengths
         self.reference_lengths += stat.reference_lengths
 
