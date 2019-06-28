@@ -47,6 +47,40 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
     assert len(opt.accum_count) == len(opt.accum_steps), \
         'Number of accum_count values must match number of accum_steps'
     # Load checkpoint if we resume from a previous training.
+    checkpoints = {}
+    if opt.train_from or opt.pretrained_encoder or opt.pretrained_decoder:
+        if opt.train_from:
+            logger.info('Loading checkpoint from %s' % opt.train_from)
+            checkpoint = torch.load(opt.train_from,
+                                map_location=lambda storage, loc: storage)
+            model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
+            logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
+            vocab = checkpoint['vocab']
+            checkpoints['full'] = checkpoint
+        if opt.pretrained_encoder:
+            logger.info('Loading pretrained encoder from %s' % opt.pretrained_encoder)
+            checkpoint = torch.load(opt.pretrained_encoder,
+                                map_location=lambda storage, loc: storage)
+            # Don't load checkpoint vocab if only pretrained encoder is loaded
+            vocab = torch.load(opt.data + '.vocab.pt')
+            model_opt = opt
+            checkpoints['encoder'] = checkpoint
+        if opt.pretrained_decoder:
+            logger.info('Loading pretrained decoder from %s' % opt.pretrained_decoder)
+            checkpoint = torch.load(opt.pretrained_decoder,
+                                map_location=lambda storage, loc: storage)
+            logger.info('Loading vocab from checkpoint at %s.' % opt.pretrained_decoder)
+            vocab = checkpoint['vocab']
+            model_opt = opt
+            checkpoints['decoder'] = checkpoint
+        ArgumentParser.update_model_opts(model_opt)
+        ArgumentParser.validate_model_opts(model_opt)
+    else:
+        #full_checkpoint = None
+        checkpoints = None
+        model_opt = opt
+        vocab = torch.load(opt.data + '.vocab.pt')
+    """
     if opt.train_from:
         logger.info('Loading checkpoint from %s' % opt.train_from)
         checkpoint = torch.load(opt.train_from,
@@ -62,6 +96,7 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
         checkpoint = None
         model_opt = opt
         vocab = torch.load(opt.data + '.vocab.pt')
+    """
 
     # check for code where vocab is saved instead of fields
     # (in the future this will be done in a smarter way)
@@ -83,7 +118,7 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
                 logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
 
     # Build model.
-    model = build_model(model_opt, opt, fields, checkpoint)
+    model = build_model(model_opt, opt, fields, checkpoints)
     n_params, enc, dec = _tally_parameters(model)
     logger.info('encoder: %d' % enc)
     logger.info('decoder: %d' % dec)

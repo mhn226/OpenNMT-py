@@ -23,12 +23,31 @@ def main(opt):
     ArgumentParser.validate_model_opts(opt)
 
     # Load checkpoint if we resume from a previous training.
-    if opt.train_from:
-        logger.info('Loading checkpoint from %s' % opt.train_from)
-        checkpoint = torch.load(opt.train_from,
+    # HN 28-06-92: add pretrained encoder and decoder
+    # Should check if opt.train_from and (opt.pretrained_encoder or opt.pretrained_decoder) appear at the same time
+    # They should not! :)
+
+    assert not (opt.train_from and (opt.pretrained_encoder or opt.pretrained_decoder)), "opt.train_from should not be presented when (opt.pretrained_encoder or opt.pretrained_decoder) presented"
+
+    if opt.train_from or opt.pretrained_encoder or opt.pretrained_decoder:
+        if opt.train_from:
+            logger.info('Loading checkpoint from %s' % opt.train_from)
+            checkpoint = torch.load(opt.train_from,
                                 map_location=lambda storage, loc: storage)
-        logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
-        vocab = checkpoint['vocab']
+            logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
+            vocab = checkpoint['vocab']
+        if opt.pretrained_encoder:
+            logger.info('Loading pretrained encoder from %s' % opt.pretrained_encoder)
+            checkpoint = torch.load(opt.pretrained_encoder,
+                                map_location=lambda storage, loc: storage)
+            # Don't load checkpoint vocab if only pretrained encoder is loaded
+            vocab = torch.load(opt.data + '.vocab.pt') 
+        if opt.pretrained_decoder:
+            logger.info('Loading pretrained decoder from %s' % opt.pretrained_decoder)
+            checkpoint = torch.load(opt.pretrained_decoder,
+                                map_location=lambda storage, loc: storage)
+            logger.info('Loading vocab from checkpoint at %s.' % opt.pretrained_decoder)
+            vocab = checkpoint['vocab']
     else:
         vocab = torch.load(opt.data + '.vocab.pt')
 

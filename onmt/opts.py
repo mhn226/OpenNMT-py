@@ -370,6 +370,15 @@ def train_opts(parser):
     group.add('--train_from', '-train_from', default='', type=str,
               help="If training from a checkpoint then this is the "
                    "path to the pretrained model's state_dict.")
+    ## HN 28-06-19: add --pretrained_encoder and --pretrained_decoder
+    # to load the corresponding part of the model
+    group.add('--pretrained_encoder', '-pretrained_encoder', default='', type=str,
+              help="If initializing from a pretrained encoder then this is the "
+                   "path to the pretrained model whose encoder is favored.")
+    group.add('--pretrained_decoder', '-pretrained_decoder', default='', type=str,
+              help="If initializing from a pretrained decoder then this is the "
+                   "path to the pretrained model whose decoder is favored.")
+
     group.add('--reset_optim', '-reset_optim', default='none',
               choices=['none', 'all', 'states', 'keep_states'],
               help="Optimization resetter when train_from.")

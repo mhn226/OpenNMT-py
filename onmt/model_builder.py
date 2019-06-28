@@ -105,7 +105,7 @@ def load_test_model(opt, model_path=None):
     model.generator.eval()
     return fields, model, model_opt
 
-def load_pretrained(model, checkpoint, part='encoder'):
+def load_pretrained(model, checkpoint, part='full'):
     """
     HN added 27-07-19
     Load only a specific part of the model (encoder/decoder) instead of 
@@ -115,11 +115,14 @@ def load_pretrained(model, checkpoint, part='encoder'):
         model: the model (or generator) whose part we want to initiallized
         checkpoint: the check point contains the part 
             whose weights we want to initialize to the model
-        part (string): 'encoder | decoder | generator'
+        part (string): 'full | encoder | decoder | generator'
     
     """
-    assert part in ['encoder', 'decoder', 'generator'], "part must be 'encoder' or 'decoder'"
+    assert part in ['full', 'encoder', 'decoder', 'generator'], "part must be 'encoder' or 'decoder'"
     print('Load ' + part)
+    if part == 'full':
+        model.load_state_dict(checkpoint, strict=False)
+        return model
     model_dict = model.state_dict()
     pretrained_dict = collections.OrderedDict()
     for key in checkpoint.keys():
@@ -135,7 +138,7 @@ def load_pretrained(model, checkpoint, part='encoder'):
     return model
 
 
-def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
+def build_base_model(model_opt, fields, gpu, checkpoints=None, gpu_id=None):
     """Build a model from opts.
 
     Args:
@@ -145,6 +148,8 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         fields (dict[str, torchtext.data.Field]):
             `Field` objects for the model.
         gpu (bool): whether to use gpu.
+      
+        HN: change checkpoint --> checkpoints - a dict of checkpoints instead of 1 checkpoint
         checkpoint: the model gnerated by train phase, or a resumed snapshot
                     model from a stopped training.
         gpu_id (int or NoneType): Which GPU to use.
@@ -206,7 +211,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         generator = CopyGenerator(model_opt.dec_rnn_size, vocab_size, pad_idx)
 
     # Load the model states from checkpoint or initialize them.
-    if checkpoint is not None:
+    if checkpoints is not None:
         # This preserves backward-compat for models using customed layernorm
         def fix_key(s):
             s = re.sub(r'(.*)\.layer_norm((_\d+)?)\.b_2',
@@ -214,11 +219,14 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
             s = re.sub(r'(.*)\.layer_norm((_\d+)?)\.a_2',
                        r'\1.layer_norm\2.weight', s)
             return s
-
-        checkpoint['model'] = {fix_key(k): v
-                               for k, v in checkpoint['model'].items()}
+        for key in checkpoints.keys():
+            checkpoints[key]['model'] = {fix_key(k): v
+                               for k, v in checkpoints[key]['model'].items()}
+            model = load_pretrained(model, checkpoints[key]['model'], key)
+        #checkpoint['model'] = {fix_key(k): v
+        #                       for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
-        model = load_pretrained(model, checkpoint['model'], 'encoder')
+        #model = load_pretrained(model, checkpoint['model'], 'encoder')
         #model = load_pretrained(model, checkpoint['model'], 'decoder')
         #for name, param in model.named_parameters():
         #    if 'encoder' in name:
