@@ -20,6 +20,8 @@ from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 
 
+import collections
+
 def build_embeddings(opt, text_field, for_encoder=True):
     """
     Args:
@@ -103,6 +105,35 @@ def load_test_model(opt, model_path=None):
     model.generator.eval()
     return fields, model, model_opt
 
+def load_pretrained(model, checkpoint, part='encoder'):
+    """
+    HN added 27-07-19
+    Load only a specific part of the model (encoder/decoder) instead of 
+        loading the whole model
+
+    Args:
+        model: the model (or generator) whose part we want to initiallized
+        checkpoint: the check point contains the part 
+            whose weights we want to initialize to the model
+        part (string): 'encoder | decoder | generator'
+    
+    """
+    assert part in ['encoder', 'decoder', 'generator'], "part must be 'encoder' or 'decoder'"
+    print('Load ' + part)
+    model_dict = model.state_dict()
+    pretrained_dict = collections.OrderedDict()
+    for key in checkpoint.keys():
+        if (part in key) or part == 'generator':
+            pretrained_dict[key] = checkpoint[key]
+    # 1. filter out unnecessary keys
+    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+    # 2. overwrite entries in the existing state dict
+    model_dict.update(pretrained_dict)
+    # 3. load the new state dict
+    model.load_state_dict(model_dict, strict=True)
+    #getattr(model, part).load_state_dict(tdict, strict=False) 
+    return model
+
 
 def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     """Build a model from opts.
@@ -145,7 +176,6 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         tgt_emb.word_lut.weight = src_emb.word_lut.weight
 
     decoder = build_decoder(model_opt, tgt_emb)
-
     # Build NMTModel(= encoder + decoder).
     if gpu and gpu_id is not None:
         device = torch.device("cuda", gpu_id)
@@ -188,9 +218,17 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
         checkpoint['model'] = {fix_key(k): v
                                for k, v in checkpoint['model'].items()}
         # end of patch for backward compatibility
-
-        model.load_state_dict(checkpoint['model'], strict=False)
-        generator.load_state_dict(checkpoint['generator'], strict=False)
+        model = load_pretrained(model, checkpoint['model'], 'encoder')
+        #model = load_pretrained(model, checkpoint['model'], 'decoder')
+        #for name, param in model.named_parameters():
+        #    if 'encoder' in name:
+        #        print(name)
+        #        print(param - checkpoint['model'][name])
+        
+        #model = load_pretrained(model, checkpoint['model'], 'decoder')
+        #model.load_state_dict(checkpoint['model'], strict=False)
+        #generator = load_pretrained(generator, checkpoint['generator'], 'generator')
+        #generator.load_state_dict(checkpoint['generator'], strict=False)
     else:
         if model_opt.param_init != 0.0:
             for p in model.parameters():

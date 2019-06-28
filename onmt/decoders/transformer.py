@@ -127,10 +127,13 @@ class TransformerDecoder(DecoderBase):
 
     def __init__(self, num_layers, d_model, heads, d_ff,
                  copy_attn, self_attn_type, dropout, embeddings,
-                 max_relative_positions):
+                 max_relative_positions, model_type):
         super(TransformerDecoder, self).__init__()
 
         self.embeddings = embeddings
+
+        ## HN modified 26-7: Add model_type
+        self.model_type = model_type
 
         # Decoder State
         self.state = {}
@@ -150,6 +153,7 @@ class TransformerDecoder(DecoderBase):
     @classmethod
     def from_opt(cls, opt, embeddings):
         """Alternate constructor."""
+        ## HN modified 26-7: Add model_type
         return cls(
             opt.dec_layers,
             opt.dec_rnn_size,
@@ -159,7 +163,8 @@ class TransformerDecoder(DecoderBase):
             opt.self_attn_type,
             opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
             embeddings,
-            opt.max_relative_positions)
+            opt.max_relative_positions,
+            opt.model_type)
 
     def init_state(self, src, memory_bank, enc_hidden):
         """Initialize decoder state."""
@@ -188,9 +193,19 @@ class TransformerDecoder(DecoderBase):
             self._init_cache(memory_bank)
 
         src = self.state["src"]
-        src_words = src[:, :, 0].transpose(0, 1)
+
+        ## HN modified 27-06: if model_type == audio, src_pad_mask should be None
+        if self.model_type == 'audio':
+            src_pad_mask = None
+        elif self.model_type == 'text':
+            pad_idx = self.embeddings.word_padding_idx
+            src_words = src[:, :, 0].transpose(0, 1)
+            #tgt_words = tgt[:, :, 0].transpose(0, 1)
+            src_batch, src_len = src_words.size()
+            src_pad_mask = src_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_src]
+            #tgt_batch, tgt_len = tgt_words.size()
+
         tgt_words = tgt[:, :, 0].transpose(0, 1)
-        src_batch, src_len = src_words.size()
         tgt_batch, tgt_len = tgt_words.size()
 
         emb = self.embeddings(tgt, step=step)
@@ -200,7 +215,7 @@ class TransformerDecoder(DecoderBase):
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
 
         pad_idx = self.embeddings.word_padding_idx
-        src_pad_mask = src_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_src]
+        #src_pad_mask = src_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_src]
         tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
 
         for i, layer in enumerate(self.transformer_layers):

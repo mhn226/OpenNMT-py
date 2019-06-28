@@ -51,7 +51,9 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
         logger.info('Loading checkpoint from %s' % opt.train_from)
         checkpoint = torch.load(opt.train_from,
                                 map_location=lambda storage, loc: storage)
-        model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
+        #model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
+        ## HN - stuck here
+        model_opt = opt
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
         logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
@@ -89,7 +91,9 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
     _check_save_model_path(opt)
 
     # Build optimizer.
-    optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint)
+    # HN for now don't load checkpoit optim opt
+    optim = Optimizer.from_opt(model, opt)
+    #optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint)
 
     # Build model saver
     model_saver = build_model_saver(model_opt, opt, model, fields, optim)

@@ -7,6 +7,8 @@ from torchtext.data import Field
 
 from onmt.inputters.datareader_base import DataReaderBase
 
+import spectrogram as sp
+
 # imports of datatype-specific dependencies
 try:
     import torchaudio
@@ -93,6 +95,54 @@ class AudioDataReader(DataReaderBase):
             spect.div_(std)
         return spect
 
+    def extract_logmel_features(self, audio_path):
+        ## HN - 28/06/19 - Take the scipt of Espnet to do fbank features extraction
+        # in the shake of syncing with Natasha
+
+        sound, sample_rate_ = torchaudio.legacy.load(audio_path)
+        if self.truncate and self.truncate > 0:
+            if sound.size(0) > self.truncate:
+                sound = sound[:self.truncate]
+
+        assert sample_rate_ == self.sample_rate, \
+            'Sample rate of %s != -sample_rate (%d vs %d)' \
+            % (audio_path, sample_rate_, self.sample_rate)
+
+        sound = sound.numpy()
+        if len(sound.shape) > 1:
+            if sound.shape[1] == 1:
+                sound = sound.squeeze()
+            else:
+                sound = sound.mean(axis=1)  # average multiple channels
+
+        n_fft = int(self.sample_rate * self.window_size)
+        win_length = n_fft
+        hop_length = int(self.sample_rate * self.window_stride)
+
+        lmspc = sp.logmelspectrogram(
+                   x=sound,
+                   fs=self.sample_rate,
+                   n_mels=80,
+                   n_fft=n_fft,
+                   n_shift=hop_length,
+                   win_length=win_length,
+                   window='hann',
+                   fmin=None,
+                   fmax=None)
+        spect = torch.FloatTensor(lmspc)
+        if self.normalize_audio:
+            mean = spect.mean()
+            std = spect.std()
+            spect.add_(-mean)
+            spect.div_(std)
+        
+        #if self.frame_trunc and self.frame_trunc > 0:
+        #    if spect.size(1) > self.frame_trunc:
+        #        print(spect.size(1))
+        #        spect = spect[:, 0:self.frame_trunc]        
+
+        return spect
+
     def read(self, data, side, src_dir=None):
         """Read data into dicts.
 
@@ -123,8 +173,10 @@ class AudioDataReader(DataReaderBase):
 
             assert os.path.exists(audio_path), \
                 'audio path %s not found' % line
-
-            spect = self.extract_features(audio_path)
+            
+            #spect = self.extract_features(audio_path)
+            ## HN extract_logmel_features
+            spect = self.extract_logmel_features(audio_path)
             yield {side: spect, side + '_path': line, 'indices': i}
 
 
