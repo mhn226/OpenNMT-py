@@ -122,7 +122,6 @@ class ModelSaver(ModelSaverBase):
                         keys_to_pop.append(key)
                 for key in keys_to_pop:
                     vocab[side].fields[0][1].vocab.stoi.pop(key, None)
-        print(model_state_dict.keys())
 
         checkpoint = {
             'model': model_state_dict,

@@ -64,7 +64,11 @@ def build_encoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
+    # HN 05-07-19 update more audio encoder
+    #enc_type = opt.encoder_type if (opt.model_type == "text" or opt.model_type == "audio") else opt.model_type
     enc_type = opt.encoder_type if opt.model_type == "text" else opt.model_type
+    if opt.model_type == "audio" and opt.encoder_type == "transformer":
+        enc_type = "transformer_audio"
     return str2enc[enc_type].from_opt(opt, embeddings)
 
 
@@ -96,8 +100,11 @@ def load_test_model(opt, model_path=None):
         )
     else:
         fields = vocab
-
-    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
+    # HN: 01-07-19: feed build_base_model a dict instead of a single checkpoint
+    # as modified for pretraining purpose
+    checkpoints = {}
+    checkpoints['full'] = checkpoint
+    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoints,
                              opt.gpu)
     if opt.fp32:
         model.float()
@@ -118,7 +125,7 @@ def load_pretrained(model, checkpoint, part='full'):
         part (string): 'full | encoder | decoder | generator'
     
     """
-    assert part in ['full', 'encoder', 'decoder', 'generator'], "part must be 'encoder' or 'decoder'"
+    assert part in ['full', 'encoder', 'decoder', 'generator'], "part must be 'full | encoder | decoder | generator'"
     print('Load ' + part)
     if part == 'full':
         model.load_state_dict(checkpoint, strict=False)
@@ -219,12 +226,17 @@ def build_base_model(model_opt, fields, gpu, checkpoints=None, gpu_id=None):
             s = re.sub(r'(.*)\.layer_norm((_\d+)?)\.a_2',
                        r'\1.layer_norm\2.weight', s)
             return s
+
         for key in checkpoints.keys():
             checkpoints[key]['model'] = {fix_key(k): v
                                for k, v in checkpoints[key]['model'].items()}
             model = load_pretrained(model, checkpoints[key]['model'], key)
-        #checkpoint['model'] = {fix_key(k): v
-        #                       for k, v in checkpoint['model'].items()}
+            if key == 'full':
+                # For now only load generator if and only if full model is loaded
+                generator.load_state_dict(checkpoints['full']['generator'], strict=False)
+        
+        #checkpoints['full']['model'] = {fix_key(k): v
+        #                       for k, v in checkpoints['full']['model'].items()}
         # end of patch for backward compatibility
         #model = load_pretrained(model, checkpoint['model'], 'encoder')
         #model = load_pretrained(model, checkpoint['model'], 'decoder')
@@ -234,7 +246,7 @@ def build_base_model(model_opt, fields, gpu, checkpoints=None, gpu_id=None):
         #        print(param - checkpoint['model'][name])
         
         #model = load_pretrained(model, checkpoint['model'], 'decoder')
-        #model.load_state_dict(checkpoint['model'], strict=False)
+        #model.load_state_dict(checkpoints['full']['model'], strict=False)
         #generator = load_pretrained(generator, checkpoint['generator'], 'generator')
         #generator.load_state_dict(checkpoint['generator'], strict=False)
     else:

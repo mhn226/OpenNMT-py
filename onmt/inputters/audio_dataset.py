@@ -140,7 +140,7 @@ class AudioDataReader(DataReaderBase):
         #    if spect.size(1) > self.frame_trunc:
         #        print(spect.size(1))
         #        spect = spect[:, 0:self.frame_trunc]        
-
+        spect = spect.transpose(0, 1)
         return spect
 
     def read(self, data, side, src_dir=None):

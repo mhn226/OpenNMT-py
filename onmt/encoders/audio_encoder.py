@@ -43,7 +43,8 @@ class AudioEncoder(EncoderBase):
         dec_rnn_size_real = dec_rnn_size // num_directions
         self.dec_rnn_size_real = dec_rnn_size_real
         self.dec_rnn_size = dec_rnn_size
-        input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
+        #input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
+        input_size = 80
         enc_pooling = enc_pooling.split(',')
         assert len(enc_pooling) == enc_layers or len(enc_pooling) == 1
         if len(enc_pooling) == 1:
