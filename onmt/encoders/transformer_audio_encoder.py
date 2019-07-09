@@ -10,7 +10,7 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 from onmt.encoders.encoder import EncoderBase
 
 from onmt.encoders.transformer import TransformerEncoderLayer
-
+from collections import OrderedDict
 
 class TransformerAudioEncoder(EncoderBase):
     """A transformer encoder for audio input.
@@ -24,9 +24,6 @@ class TransformerAudioEncoder(EncoderBase):
         dec_layers (int): Number of decoder layers.
         brnn (bool): Bidirectional encoder.
         enc_rnn_size (int): Size of hidden states of the rnn.
-        dec_rnn_size (int): Size of the decoder hidden states.
-        enc_pooling (str): A comma separated list either of length 1
-            or of length ``enc_layers`` specifying the pooling amount.
         dropout (float): dropout probablity.
         sample_rate (float): input spec
         window_size (int): input spec
@@ -43,16 +40,60 @@ class TransformerAudioEncoder(EncoderBase):
 
         self.max_relative_positions = max_relative_positions
 
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=(3, 3),
-                                padding=(0, 10), stride=(2, 2))
+
+        # Two blocks of conv, 2 layers of conv each block
+        # Try to use batchnorm instead of layernorm
+        #self.conv1 = nn.Sequential(OrderedDict([
+        #             ('conv1', nn.Conv2d(1, 64, kernel_size=(3, 3), padding=(0, 10), stride=(2, 2))),
+        #             ('batchnorm1', nn.BatchNorm2d(64)),
+        #             ('relu1', nn.ReLU()),
+        #             ('conv2', nn.Conv2d(64, 64, kernel_size=(3, 3), padding=(0, 10), stride=(2, 2))),
+        #             ('batchnorm2', nn.BatchNorm2d(64)),
+        #             ('relu2', nn.ReLU())]))
+
+
+        # Conv block 1
+        self.b1_conv1 = nn.Conv2d(1, 64, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b1_layernorm1 = nn.LayerNorm((80, 64), eps=1e-6)
+        self.b1_relu1 = nn.ReLU()
+        self.b1_conv2 = nn.Conv2d(64, 64, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b1_layernorm2 = nn.LayerNorm((80, 64), eps=1e-6)
+        self.b1_relu2 = nn.ReLU()
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, padding=0)
+        
+        # Conv block 2
+        self.b2_conv1 = nn.Conv2d(64, 128, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b2_layernorm1 = nn.LayerNorm((40, 128), eps=1e-6)
+        self.b2_relu1 = nn.ReLU()
+        self.b2_conv2 = nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b2_layernorm2 = nn.LayerNorm((40, 128), eps=1e-6)
+        self.b2_relu2 = nn.ReLU()
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2, padding=0)
+
+        #self.conv1 = nn.Conv2d(1, 64, kernel_size=(3, 3),
+        #                        padding=(0, 10), stride=(2, 2))
         #self.batch_norm1 = nn.BatchNorm2d(1)        
 
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=(3, 3),
-                                padding=(0, 0), stride=(2, 2))
+        #self.conv3 = nn.Sequential(OrderedDict([
+        #             ('conv3', nn.Conv2d(64, 128, kernel_size=(3, 3), padding=(0, 10), stride=(2, 2))),
+        #             ('batchnorm3', nn.BatchNorm2d(128)),
+        #             ('relu3', nn.ReLU()),
+        #             ('conv4', nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(0, 10), stride=(2, 2))),
+        #             ('batchnorm4', nn.BatchNorm2d(128)),
+        #             ('relu4', nn.ReLU())]))
+
+        #self.conv2 = nn.Conv2d(64, 128, kernel_size=(3, 3),
+        #                        padding=(0, 0), stride=(2, 2))
         #self.batch_norm2 = nn.BatchNorm2d(16)
 
-        #input_size = 128 * 19
-        input_size = 2432
+
+        #input_size = 128 * 19 = 2432
+        #input_size = 56 * 24 = 1344
+        #input_size = 2432 
+        #input_size = 256
+        #input_size = 896
+        #input_size = 1024
+        input_size = 2560
         self.W = nn.Linear(input_size, d_model, bias=False)
 
         self.transformer = nn.ModuleList(
@@ -84,16 +125,29 @@ class TransformerAudioEncoder(EncoderBase):
         #         .view(t, batch_size, nfft)
         orig_lengths = lengths
         lengths = lengths.view(-1).tolist()
+        # Conv block 1
+        src = self.b1_conv1(src[:, :, :, :])
+        src = self.b1_layernorm1(src.transpose(3, 1))
+        src = self.b1_relu1(src.transpose(3, 1))
+        src = self.b1_conv2(src)
+        src = self.b1_layernorm2(src.transpose(3, 1))
+        src = self.b1_relu2(src.transpose(3, 1))
+        src = self.maxpool1(src)
 
-        src = self.conv1(src[:, :, :, :])
+        # Conv block 2
+        src = self.b2_conv1(src)
+        src = self.b2_layernorm1(src.transpose(3, 1))
+        src = self.b2_relu1(src.transpose(3, 1))
+        src = self.b2_conv2(src)
+        src = self.b2_layernorm2(src.transpose(3, 1))
+        src = self.b2_relu2(src.transpose(3, 1))
+        src = self.maxpool2(src)
         #src = batch_norm1(src)
-
-        src = self.conv2(src)
+        #src = self.conv2(src)
         #src = self.batch_norm2(src)
         length = src.size(3)
         src = src.view(batch_size, -1, length)
         src = src.transpose(0, 2).transpose(1, 2)
-
         src = self.W(src)
         tmp = src
         
@@ -101,7 +155,7 @@ class TransformerAudioEncoder(EncoderBase):
             src = layer(src, None)
         memory_bank = self.layer_norm(src) 
 
-        return tmp, memory_bank, lengths
+        return tmp, memory_bank, orig_lengths.new_tensor(lengths)
 
     def update_dropout(self, dropout):
         self.dropout = dropout
