@@ -111,7 +111,6 @@ class Dataset(TorchtextDataset):
                  filter_pred=None):
         self.sort_key = sort_key
         can_copy = 'src_map' in fields and 'alignment' in fields
-
         read_iters = [r.read(dat[1], dat[0], dir_) for r, dat, dir_
                       in zip(readers, data, dirs)]
 
@@ -136,7 +135,6 @@ class Dataset(TorchtextDataset):
         for _, nf_list in ex_fields.items():
             assert len(nf_list) == 1
             fields.append(nf_list[0])
-
         super(Dataset, self).__init__(examples, fields, filter_pred)
 
     def __getattr__(self, attr):

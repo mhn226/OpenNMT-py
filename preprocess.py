@@ -31,7 +31,7 @@ def check_existing_pt_files(opt):
             sys.exit(1)
 
 
-def build_save_dataset(corpus_type, fields, src_reader, tgt_reader, opt):
+def build_save_dataset(corpus_type, fields, src_reader, tgt_reader, opt, kaldi=False):
     assert corpus_type in ['train', 'valid']
 
     if corpus_type == 'train':
@@ -46,15 +46,20 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader, opt):
 
     for src, tgt, maybe_id in zip(srcs, tgts, ids):
         logger.info("Reading source and target files: %s %s." % (src, tgt))
-
-        src_shards = split_corpus(src, opt.shard_size)
-        tgt_shards = split_corpus(tgt, opt.shard_size)
+        # HN 22-07-19: process from kaldi files or not?
+        src_shards = split_corpus(src, opt.shard_size, kaldi)
+        tgt_shards = split_corpus(tgt, opt.shard_size, kaldi)
         shard_pairs = zip(src_shards, tgt_shards)
         dataset_paths = []
         if (corpus_type == "train" or opt.filter_valid) and tgt is not None:
+            # HN 23-07-19: set use_src_len = True so that it will cut too long
+            # segments based on (max) src_seq_length
             filter_pred = partial(
-                inputters.filter_example, use_src_len=opt.data_type == "text",
+                inputters.filter_example, use_src_len=True,
                 max_src_len=opt.src_seq_length, max_tgt_len=opt.tgt_seq_length)
+            #filter_pred = partial(
+            #    inputters.filter_example, use_src_len=opt.data_type == "text",
+            #    max_src_len=opt.src_seq_length, max_tgt_len=opt.tgt_seq_length)
         else:
             filter_pred = None
 
@@ -80,7 +85,8 @@ def build_save_dataset(corpus_type, fields, src_reader, tgt_reader, opt):
                 tgt_vocab = None
 
         for i, (src_shard, tgt_shard) in enumerate(shard_pairs):
-            assert len(src_shard) == len(tgt_shard)
+            if not kaldi:
+                assert len(src_shard) == len(tgt_shard)
             logger.info("Building shard %d." % i)
             dataset = inputters.Dataset(
                 fields,
@@ -196,11 +202,11 @@ def main(opt):
 
     logger.info("Building & saving training data...")
     build_save_dataset(
-        'train', fields, src_reader, tgt_reader, opt)
+        'train', fields, src_reader, tgt_reader, opt, opt.kaldi)
 
     if opt.valid_src and opt.valid_tgt:
         logger.info("Building & saving validation data...")
-        build_save_dataset('valid', fields, src_reader, tgt_reader, opt)
+        build_save_dataset('valid', fields, src_reader, tgt_reader, opt, opt.kaldi)
 
 
 def _get_parser():

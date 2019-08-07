@@ -58,6 +58,10 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
         opt.early_stopping, scorers=onmt.utils.scorers_from_opts(opt)) \
         if opt.early_stopping > 0 else None
 
+    # HN 09/07/17: add bleu (bool). Should we report bleu or not
+    # exp: MT and AST need bleu, but ASR
+    bleu = opt.bleu
+
     report_manager = onmt.utils.build_report_manager(opt)
     trainer = onmt.Trainer(model, train_loss, valid_loss, optim, trunc_size,
                            shard_size, norm_method,
@@ -70,7 +74,8 @@ def build_trainer(opt, device_id, model, fields, optim, model_saver=None):
                            model_dtype=opt.model_dtype,
                            earlystopper=earlystopper,
                            dropout=dropout,
-                           dropout_steps=dropout_steps)
+                           dropout_steps=dropout_steps,
+                           bleu=bleu)
     return trainer
 
 
@@ -98,6 +103,7 @@ class Trainer(object):
             model_saver(:obj:`onmt.models.ModelSaverBase`): the saver is
                 used to save a checkpoint.
                 Thus nothing will be saved if this parameter is None
+            bleu (bool): report bleu or not
     """
 
     def __init__(self, model, train_loss, valid_loss, optim,
@@ -107,7 +113,7 @@ class Trainer(object):
                  n_gpu=1, gpu_rank=1,
                  gpu_verbose_level=0, report_manager=None, model_saver=None,
                  average_decay=0, average_every=1, model_dtype='fp32',
-                 earlystopper=None, dropout=[0.3], dropout_steps=[0]):
+                 earlystopper=None, dropout=[0.3], dropout_steps=[0], bleu=False):
         # Basic attributes.
         self.model = model
         self.train_loss = train_loss
@@ -131,6 +137,9 @@ class Trainer(object):
         self.earlystopper = earlystopper
         self.dropout = dropout
         self.dropout_steps = dropout_steps
+
+        # HN add bleu 09/07/19
+        self.bleu = bleu
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -275,13 +284,17 @@ class Trainer(object):
             if (self.model_saver is not None
                 and (save_checkpoint_steps != 0
                      and step % save_checkpoint_steps == 0)):
-                self.model_saver.save(step, moving_average=self.moving_average)
+                # Add validation stats
+                self.model_saver.save(step, valid_stats, moving_average=self.moving_average)
+                #self.model_saver.save(step, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
         if self.model_saver is not None:
-            self.model_saver.save(step, moving_average=self.moving_average)
+            # Add validation stats
+            self.model_saver.save(step, valid_stats, moving_average=self.moving_average)
+            #self.model_saver.save(step, moving_average=self.moving_average)
         return total_stats
 
     def validate(self, valid_iter, moving_average=None):
@@ -302,7 +315,7 @@ class Trainer(object):
         valid_model.eval()
 
         with torch.no_grad():
-            stats = onmt.utils.Statistics()
+            stats = onmt.utils.Statistics(bleu=self.bleu)
 
             for batch in valid_iter:
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) \

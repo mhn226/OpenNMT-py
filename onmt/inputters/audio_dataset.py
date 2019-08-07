@@ -9,6 +9,8 @@ from onmt.inputters.datareader_base import DataReaderBase
 
 import spectrogram as sp
 
+import kaldiio
+
 # imports of datatype-specific dependencies
 try:
     import torchaudio
@@ -38,7 +40,7 @@ class AudioDataReader(DataReaderBase):
     """
 
     def __init__(self, sample_rate=0, window_size=0, window_stride=0,
-                 window=None, normalize_audio=True, truncate=None):
+                 window=None, normalize_audio=True, truncate=None, feature_size=80, kaldi=False):
         self._check_deps()
         self.sample_rate = sample_rate
         self.window_size = window_size
@@ -46,11 +48,13 @@ class AudioDataReader(DataReaderBase):
         self.window = window
         self.normalize_audio = normalize_audio
         self.truncate = truncate
+        self.feature_size = feature_size
+        self.kaldi = kaldi
 
     @classmethod
     def from_opt(cls, opt):
         return cls(sample_rate=opt.sample_rate, window_size=opt.window_size,
-                   window_stride=opt.window_stride, window=opt.window)
+                   window_stride=opt.window_stride, window=opt.window, feature_size=opt.feature_size, kaldi=opt.kaldi)
 
     @classmethod
     def _check_deps(cls):
@@ -118,11 +122,10 @@ class AudioDataReader(DataReaderBase):
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
-
         lmspc = sp.logmelspectrogram(
                    x=sound,
                    fs=self.sample_rate,
-                   n_mels=80,
+                   n_mels=self.feature_size,
                    n_fft=n_fft,
                    n_shift=hop_length,
                    win_length=win_length,
@@ -139,7 +142,7 @@ class AudioDataReader(DataReaderBase):
         #if self.frame_trunc and self.frame_trunc > 0:
         #    if spect.size(1) > self.frame_trunc:
         #        print(spect.size(1))
-        #        spect = spect[:, 0:self.frame_trunc]        
+        #        spect = spect[:, 0:self.frame_trunc]
         spect = spect.transpose(0, 1)
         return spect
 
@@ -161,23 +164,30 @@ class AudioDataReader(DataReaderBase):
 
         assert src_dir is not None and os.path.exists(src_dir),\
             "src_dir must be a valid directory if data_type is audio"
+        # HN 22-07-19: if data type == kaldi, process differently
+        if self.kaldi:
+            d = kaldiio.load_ark(data)
+            for i, (key, numpy_array) in enumerate(d):
+                spect = torch.FloatTensor(numpy_array)
+                spect = spect.transpose(0, 1)
+                yield {side: spect, side + '_path': key, 'indices': i}
+        else:
+            if isinstance(data, str):
+                data = DataReaderBase._read_file(data)
 
-        if isinstance(data, str):
-            data = DataReaderBase._read_file(data)
+            for i, line in enumerate(tqdm(data)):
+                line = line.decode("utf-8").strip()
+                audio_path = os.path.join(src_dir, line)
+                if not os.path.exists(audio_path):
+                    audio_path = line
 
-        for i, line in enumerate(tqdm(data)):
-            line = line.decode("utf-8").strip()
-            audio_path = os.path.join(src_dir, line)
-            if not os.path.exists(audio_path):
-                audio_path = line
-
-            assert os.path.exists(audio_path), \
-                'audio path %s not found' % line
+                assert os.path.exists(audio_path), \
+                    'audio path %s not found' % line
             
-            #spect = self.extract_features(audio_path)
-            ## HN extract_logmel_features
-            spect = self.extract_logmel_features(audio_path)
-            yield {side: spect, side + '_path': line, 'indices': i}
+                spect = self.extract_features(audio_path)
+                # HN extract_logmel_features
+                spect = self.extract_logmel_features(audio_path)
+                yield {side: spect, side + '_path': line, 'indices': i}
 
 
 def audio_sort_key(ex):

@@ -1,6 +1,6 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
-
+import torch
 
 class NMTModel(nn.Module):
     """
@@ -38,7 +38,9 @@ class NMTModel(nn.Module):
             * dictionary attention dists of ``(tgt_len, batch, src_len)``
         """
         tgt = tgt[:-1]  # exclude last target from inputs
-
+        # HN 21-07-19: Freeze speech encoder        
+        #with torch.no_grad():        
+        #    enc_state, memory_bank, lengths = self.encoder(src, lengths)
         enc_state, memory_bank, lengths = self.encoder(src, lengths)
         if bptt is False:
             self.decoder.init_state(src, memory_bank, enc_state)

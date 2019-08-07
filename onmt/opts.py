@@ -96,6 +96,9 @@ def model_opts(parser):
               help="Size of decoder rnn hidden states. "
                    "Must be equal to enc_rnn_size except for "
                    "speech-to-text.")
+    # HN 23-07-19: add feature_size
+    group.add('--feature_size', '-feature_size', type=int, default=80,
+              help="Size of input feature.")
     group.add('--audio_enc_pooling', '-audio_enc_pooling',
               type=str, default='1',
               help="The amount of pooling of audio encoder, "
@@ -192,7 +195,12 @@ def preprocess_opts(parser):
     group.add('--data_type', '-data_type', default="text",
               help="Type of the source input. "
                    "Options are [text|img|audio].")
-
+    # HN 30-07-19: add feature_size 
+    group.add('--feature_size', '-feature_size', type=int, default=80,
+              help="Size of input feature.")
+    # HN 22-07-19: Add kaldi option
+    group.add('--kaldi', '-kaldi', action="store_true",
+              help="Preprocess from Kaldi files.")
     group.add('--train_src', '-train_src', required=True, nargs='+',
               help="Path(s) to the training source data")
     group.add('--train_tgt', '-train_tgt', required=True, nargs='+',
@@ -540,6 +548,9 @@ def train_opts(parser):
               help="Send logs to this crayon server.")
     group.add('--exp', '-exp', type=str, default="",
               help="Name of the experiment for logging.")
+    # HN 09/07/17: add bleu (bool)
+    group.add('--bleu', '-bleu', action="store_true",
+              help="Report Bleu score for validation set or not. ")
     # Use TensorboardX for visualization during training
     group.add('--tensorboard', '-tensorboard', action="store_true",
               help="Use tensorboardX for visualization during training. "
@@ -585,6 +596,13 @@ def translate_opts(parser):
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
               help="Type of the source input. Options: [text|img].")
+    # HN 23-07-19: add feature_size 
+    group.add('--feature_size', '-feature_size', type=int, default=80,
+              help="Size of input feature.")
+    # HN 23-07-19: Add option for kaldi
+    group.add('--kaldi', '-kaldi', action='store_true',
+              help="Load kaldi featues instead of audio files.")
+
 
     group.add('--src', '-src', required=True,
               help="Source sequence to decode (one line per "

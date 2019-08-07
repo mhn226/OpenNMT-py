@@ -138,6 +138,19 @@ class TransformerDecoder(DecoderBase):
         # Decoder State
         self.state = {}
 
+        ## HN modified 12-07: Add conv blocks
+        # Conv block 1
+        #self.b1_conv1 = nn.Conv1d(d_model, d_model, kernel_size=3, padding=1, stride=1)
+        #self.b1_layernorm1 = nn.LayerNorm(d_model, eps=1e-6)
+        #self.b1_relu1 = nn.ReLU()
+        #self.b1_conv2 = nn.Conv1d(d_model, d_model, kernel_size=3, padding=1, stride=1)
+        #self.b1_layernorm2 = nn.LayerNorm(d_model, eps=1e-6)
+        #self.b1_relu2 = nn.ReLU()
+        #self.b1_conv3 = nn.Conv1d(d_model, d_model, kernel_size=3, padding=1, stride=1)
+        #self.b1_layernorm3 = nn.LayerNorm(d_model, eps=1e-6)
+        #self.b1_relu3 = nn.ReLU()
+
+
         self.transformer_layers = nn.ModuleList(
             [TransformerDecoderLayer(d_model, heads, d_ff, dropout,
              self_attn_type=self_attn_type,
@@ -211,6 +224,21 @@ class TransformerDecoder(DecoderBase):
         assert emb.dim() == 3  # len x batch x embedding_dim
 
         output = emb.transpose(0, 1).contiguous()
+        #output = emb.transpose(0, 1).transpose(1, 2).contiguous()
+        
+        # HN modified 12-07: add conv blocks
+        #output = self.b1_conv1(output[:, :, :])
+        #output = self.b1_layernorm1(output.transpose(2, 1))
+        #output = self.b1_relu1(output.transpose(2, 1))
+        #output = self.b1_conv2(output)
+        #output = self.b1_layernorm2(output.transpose(2, 1))
+        #output = self.b1_relu2(output.transpose(2, 1))
+        #output = self.b1_conv3(output)
+        #output = self.b1_layernorm3(output.transpose(2, 1))
+        #output = self.b1_relu3(output.transpose(2, 1))
+
+        #output = output.transpose(1, 2).contiguous()
+
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
         pad_idx = self.embeddings.word_padding_idx
         #src_pad_mask = src_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_src]

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import onmt
 from onmt.modules.sparse_losses import SparsemaxLoss
 from onmt.modules.sparse_activations import LogSparsemax
-
+from onmt.utils.bleu import bleu_calculations
 
 def build_loss_compute(model, tgt_field, opt, train=True):
     """
@@ -170,11 +170,28 @@ class LossComputeBase(nn.Module):
         Returns:
             :obj:`onmt.utils.Statistics` : statistics for this batch.
         """
-        pred = scores.max(1)[1]
-        non_padding = target.ne(self.padding_idx)
-        num_correct = pred.eq(target).masked_select(non_padding).sum().item()
+
+        pred = scores.max(2)[1]
+        precision_matches, precision_totals, \
+            prediction_lengths, reference_lengths = \
+            bleu_calculations(
+                    pred,
+                    target,
+                    4,
+                    {self.padding_idx})
+
+        non_padding = target.view(-1).ne(self.padding_idx)
+        num_correct = pred.view(-1).eq(target.view(-1)).\
+            masked_select(non_padding).sum().item()
+
+        #pred = scores.max(1)[1]
+        #non_padding = target.ne(self.padding_idx)
+        #num_correct = pred.eq(target).masked_select(non_padding).sum().item()
         num_non_padding = non_padding.sum().item()
-        return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct)
+        #return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct)
+        return onmt.utils.Statistics(loss.item(), num_non_padding, num_correct,
+                                     precision_matches, precision_totals,
+                                     prediction_lengths, reference_lengths)
 
     def _bottle(self, _v):
         return _v.view(-1, _v.size(2))
@@ -229,12 +246,14 @@ class NMTLossCompute(LossComputeBase):
 
     def _compute_loss(self, batch, output, target):
         bottled_output = self._bottle(output)
-
         scores = self.generator(bottled_output)
         gtruth = target.view(-1)
-
         loss = self.criterion(scores, gtruth)
-        stats = self._stats(loss.clone(), scores, gtruth)
+
+        scores = scores.view(-1, batch.tgt.size(1), scores.size(1))
+        stats = self._stats(loss.clone(), scores, target)
+
+        #stats = self._stats(loss.clone(), scores, gtruth)
 
         return loss, stats
 

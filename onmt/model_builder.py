@@ -91,6 +91,8 @@ def load_test_model(opt, model_path=None):
                             map_location=lambda storage, loc: storage)
 
     model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
+    # HN 24-07-19: add feature_size
+    model_opt.feature_size = opt.feature_size
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
     vocab = checkpoint['vocab']

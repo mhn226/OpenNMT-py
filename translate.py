@@ -17,8 +17,9 @@ def main(opt):
     logger = init_logger(opt.log_file)
 
     translator = build_translator(opt, report_score=True)
-    src_shards = split_corpus(opt.src, opt.shard_size)
-    tgt_shards = split_corpus(opt.tgt, opt.shard_size) \
+    # HN 23-07-19: add kaldi option
+    src_shards = split_corpus(opt.src, opt.shard_size, opt.kaldi)
+    tgt_shards = split_corpus(opt.tgt, opt.shard_size, opt.kaldi) \
         if opt.tgt is not None else repeat(None)
     shard_pairs = zip(src_shards, tgt_shards)
 

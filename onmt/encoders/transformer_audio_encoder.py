@@ -70,6 +70,15 @@ class TransformerAudioEncoder(EncoderBase):
         self.b2_relu2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=2, padding=0)
 
+        # Conv block 3
+        self.b3_conv1 = nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b3_layernorm1 = nn.LayerNorm((20, 128), eps=1e-6)
+        self.b3_relu1 = nn.ReLU()
+        self.b3_conv2 = nn.Conv2d(128, 128, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))
+        self.b3_layernorm2 = nn.LayerNorm((20, 128), eps=1e-6)
+        self.b3_relu2 = nn.ReLU()
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2, padding=0)
+
         #self.conv1 = nn.Conv2d(1, 64, kernel_size=(3, 3),
         #                        padding=(0, 10), stride=(2, 2))
         #self.batch_norm1 = nn.BatchNorm2d(1)        
@@ -93,7 +102,8 @@ class TransformerAudioEncoder(EncoderBase):
         #input_size = 256
         #input_size = 896
         #input_size = 1024
-        input_size = 2560
+        #input_size = 2560
+        input_size = 1280
         self.W = nn.Linear(input_size, d_model, bias=False)
 
         self.transformer = nn.ModuleList(
@@ -142,6 +152,16 @@ class TransformerAudioEncoder(EncoderBase):
         src = self.b2_layernorm2(src.transpose(3, 1))
         src = self.b2_relu2(src.transpose(3, 1))
         src = self.maxpool2(src)
+
+        # Conv block 3
+        src = self.b3_conv1(src)
+        src = self.b3_layernorm1(src.transpose(3, 1))
+        src = self.b3_relu1(src.transpose(3, 1))
+        src = self.b3_conv2(src)
+        src = self.b3_layernorm2(src.transpose(3, 1))
+        src = self.b3_relu2(src.transpose(3, 1))
+        src = self.maxpool3(src)
+        
         #src = batch_norm1(src)
         #src = self.conv2(src)
         #src = self.batch_norm2(src)

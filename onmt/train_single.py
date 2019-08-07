@@ -127,7 +127,11 @@ def main(opt, device_id, batch_queue=None, semaphore=None):
 
     # Build optimizer.
     # HN for now don't load checkpoit optim opt
-    optim = Optimizer.from_opt(model, opt)
+    if opt.train_from:
+        print('tada')
+        optim = Optimizer.from_opt(model, opt, checkpoint=checkpoints['full'])
+    else:
+        optim = Optimizer.from_opt(model, opt)
     #optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint)
 
     # Build model saver

@@ -4,18 +4,40 @@ import torch
 import random
 import inspect
 from itertools import islice
+import glob
 
-
-def split_corpus(path, shard_size):
-    with open(path, "rb") as f:
-        if shard_size <= 0:
-            yield f.readlines()
+def split_corpus(path, shard_size, kaldi=False):
+    # HN - 22-07-19: add kaldi
+    # If shard type == kaldi, process differently
+    # List all files, yield one by one
+    if kaldi:
+        f_name = path.replace('.ark', '').replace('.char.txt', '').replace('.1', '')
+        if '.ark' in path:
+            dataset_paths = list(sorted(glob.glob('./' + f_name + '.[0-9]*' + '.ark')))
+            print(dataset_paths)
+            for dataset_path in dataset_paths:
+                print(dataset_path)
+                yield dataset_path
         else:
-            while True:
-                shard = list(islice(f, shard_size))
-                if not shard:
-                    break
-                yield shard
+            dataset_paths = list(sorted(glob.glob('./' + f_name + '.[0-9]*' + '.char.txt')))
+            print(dataset_paths)
+            for dataset_path in dataset_paths:
+                print(dataset_path)
+                with open(path, "rb") as f:
+                    yield list(f)
+        #for dataset_path in dataset_paths:
+        #    print(dataset_path)
+        #    yield dataset_path
+    else: 
+        with open(path, "rb") as f:
+            if shard_size <= 0:
+                yield f.readlines()
+            else:
+                while True:
+                    shard = list(islice(f, shard_size))
+                    if not shard:
+                        break
+                    yield shard
 
 
 def aeq(*args):

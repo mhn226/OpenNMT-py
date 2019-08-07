@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Train models."""
+from __future__ import division
 import os
 import signal
 import torch
@@ -16,6 +17,8 @@ from onmt.inputters.inputter import build_dataset_iter, \
 
 from itertools import cycle
 
+import gc
+import glob
 
 def main(opt):
     ArgumentParser.validate_train_opts(opt)
@@ -59,6 +62,23 @@ def main(opt):
     else:
         fields = vocab
 
+    # HN 24-07-19: Count number of examples in the corpus
+    count = 0
+    dataset_paths = list(sorted(glob.glob(opt.data + '.train' + '.[0-9]*.pt')))
+    for dataset_path in dataset_paths:
+        tmp = torch.load(dataset_path)
+        count += len(tmp)
+        gc.collect()
+        del tmp.examples
+        gc.collect()
+        del tmp
+        gc.collect()
+
+    print('number of examples in the corpus: ' + str(count))
+    import math
+    opt.valid_steps = int(math.ceil(count / opt.batch_size))
+    opt.save_checkpoint_steps = int(math.ceil(count / opt.batch_size))
+    
     if len(opt.data_ids) > 1:
         train_shards = []
         for train_id in opt.data_ids:

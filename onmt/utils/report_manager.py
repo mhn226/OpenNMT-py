@@ -136,7 +136,7 @@ class ReportMgr(ReportMgrBase):
 
         return report_stats
 
-    def _report_step(self, lr, step, train_stats=None, valid_stats=None):
+    def _report_step(self, lr, step, train_stats=None, valid_stats=None, bleu=False):
         """
         See base class method `ReportMgrBase.report_step`.
         """
@@ -152,7 +152,8 @@ class ReportMgr(ReportMgrBase):
         if valid_stats is not None:
             self.log('Validation perplexity: %g' % valid_stats.ppl())
             self.log('Validation accuracy: %g' % valid_stats.accuracy())
-
+            if bleu:
+                self.log('Validation bleu: %g' % valid_stats.bleu())
             self.maybe_log_tensorboard(valid_stats,
                                        "valid",
                                        lr,
